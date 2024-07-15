@@ -1,6 +1,9 @@
 package lib
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 /*
 
@@ -93,24 +96,26 @@ var NUMBER = [][][]int8{
 }
 
 type Board struct {
-	R      int
-	C      int
-	layers [][][]int8
-	flat   [][]int8
-	seen   []bool
+	R         int
+	C         int
+	layers    [][][]int8
+	flat      [][]int8
+	seen      []int
+	seenLimit int
 }
 
 func NewBoard() *Board {
-	return newBoardRC(12, 12)
+	return newBoardRC(12, 12, 2)
 }
 
-func newBoardRC(rows, cols int) *Board {
+func newBoardRC(rows, cols int, seenLimit int) *Board {
 	return &Board{
-		R:      rows,
-		C:      cols,
-		layers: make([][][]int8, 0, 10),
-		flat:   makeFlatRC(rows, cols),
-		seen:   make([]bool, 10),
+		R:         rows,
+		C:         cols,
+		layers:    make([][][]int8, 0, 10),
+		flat:      makeFlatRC(rows, cols),
+		seen:      make([]int, 10),
+		seenLimit: seenLimit,
 	}
 }
 
@@ -125,7 +130,7 @@ func (board *Board) putNumberAtLayer(level int8, num, row, col int) {
 	layer := board.layers[level]
 	putNumber(layer, num, row, col)
 	board.flat = flatten(board.flat, layer, level)
-	board.seen[num] = true
+	board.seen[num]++
 }
 
 func (board *Board) setBaseLayer(num int) {
@@ -143,10 +148,10 @@ func (board *Board) ApplyBestMove(num int, steps int) (error, int) {
 		board.setBaseLayer(num)
 		return nil, 0
 	} else {
-		if board.seen[num] {
-			return fmt.Errorf("num:%v has already been seen", num), 0
+		if board.seen[num] >= board.seenLimit {
+			return fmt.Errorf("num:%v has already been seen limit:%v times", num, board.seenLimit), 0
 		}
-		bestR, bestC, bestLevel, maxScore, err := findBestMoveV2(board.flat, board.seen, num, steps)
+		bestR, bestC, bestLevel, maxScore, err := findBestMoveV2(board.flat, board.seen, board.seenLimit, num, steps)
 		if err != nil {
 			return err, 0
 		}
@@ -169,7 +174,7 @@ func (board *Board) printFlat() {
 	printLayer(board.flat)
 }
 
-func findBestMoveV2(flat [][]int8, seen []bool, num int, steps int) (int, int, int8, int, error) {
+func findBestMoveV2(flat [][]int8, seen []int, seenLimit int, num int, steps int) (int, int, int8, int, error) {
 	maxScore := -10000
 	R, C := getLayerSize(flat)
 	hasValid := false
@@ -190,23 +195,25 @@ func findBestMoveV2(flat [][]int8, seen []bool, num int, steps int) (int, int, i
 					// apply move
 					layer := makeLayerRC(R, C)
 					putNumber(layer, num, r, c)
-					seen[num] = true
+					seen[num]++
 					// compute new flat
 					newFlat := copyFlat(flat)
 					flatten(newFlat, layer, level)
 					// recursively find best move
-					for i := range seen {
-						if !seen[i] {
-							_, _, _, futureScore, err := findBestMoveV2(newFlat, seen, i, steps-1)
-							if err == nil && newScore+futureScore > maxScore {
-								maxScore = newScore + futureScore
-								bestR, bestC = r, c
-								bestLevel = level
+					for s := 0; s < seenLimit; s++ {
+						for i := range seen {
+							if seen[i] < seenLimit {
+								_, _, _, futureScore, err := findBestMoveV2(newFlat, seen, seenLimit, i, steps-1)
+								if err == nil && newScore+futureScore > maxScore {
+									maxScore = newScore + futureScore
+									bestR, bestC = r, c
+									bestLevel = level
+								}
 							}
 						}
 					}
 					// undo move to backtrack
-					seen[num] = false
+					seen[num]--
 				}
 			}
 		}
@@ -251,17 +258,6 @@ func copyFlat(flat [][]int8) [][]int8 {
 }
 
 func score(num int, level int8) int {
-	// n := NUMBER[num]
-	// NR, NC := getNumberSize(n)
-	// score := 0
-	// for r := 0; r < NR; r++ {
-	// 	for c := 0; c < NC; c++ {
-	// 		if n[r][c] != EMPTY {
-	// 			score += num * int(level)
-	// 		}
-	// 	}
-	// }
-	// return score
 	return num * int(level)
 }
 
@@ -434,18 +430,19 @@ func printLayer(layer [][]int8) {
 }
 
 func printLayers(layers [][][]int8) {
-	fmt.Println("=====================")
 	if len(layers) == 0 {
+		fmt.Println("==========")
 		return
 	}
 	R, C := getLayerSize(layers[0])
+	fmt.Println(strings.Repeat("=", (C+3)*len(layers)))
 	for r := 0; r < R; r++ {
 		for _, layer := range layers {
 			for c := 0; c < C; c++ {
 				if layer[r][c] == EMPTY {
 					fmt.Printf(".")
 				} else {
-					fmt.Printf("%v", layer[r][c])
+					fmt.Printf(color(layer[r][c], "%v"), layer[r][c])
 				}
 			}
 			if r == R/2 {
@@ -456,4 +453,36 @@ func printLayers(layers [][][]int8) {
 		}
 		fmt.Println()
 	}
+}
+
+var Reset = "\033[0m"
+var Red = "\033[31m"
+var Green = "\033[32m"
+var Yellow = "\033[33m"
+var Blue = "\033[34m"
+var Magenta = "\033[35m"
+var Cyan = "\033[36m"
+var Gray = "\033[37m"
+var Purple = "\033[90m"
+var White = "\033[97m"
+var Orange = "\033[91m"
+var Pink = "\033[35m"
+
+// var Brown = "\033[94m"
+
+var COLOR = []string{
+	Gray,
+	Gray,
+	Orange,
+	Yellow,
+	Green,
+	Cyan,
+	Blue,
+	Purple,
+	Orange,
+	Red,
+}
+
+func color(num int8, str string) string {
+	return COLOR[num] + str + Reset
 }

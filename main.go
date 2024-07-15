@@ -33,19 +33,26 @@ import (
 
 func main() {
 	// input := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	steps := 3
+	fmt.Printf("how many steps ahead (default:%v): ", steps)
+	_, err := fmt.Scanf("%d\n", &steps)
+	if err != nil && err.Error() != "unexpected newline" {
+		fmt.Printf("error scanning input: %v\n", err)
+		return
+	}
 	board := lib.NewBoard()
 	var num int
 	for {
 		fmt.Print("enter a number: ")
-		_, err := fmt.Scanf("%d\n", &num)
+		_, err := fmt.Scanf("%d", &num)
 		if err != nil {
 			fmt.Printf("error scanning input: %v\n", err)
 			break
 		}
-		err, _ = board.ApplyBestMove(num, 4)
+		err, _ = board.ApplyBestMove(num, steps)
 		if err != nil {
 			fmt.Printf("error applying best move: %v\n", err)
-			break
+			continue
 		} else {
 			board.PrintOverlays()
 			// fmt.Printf("best move score: %v\n", score)

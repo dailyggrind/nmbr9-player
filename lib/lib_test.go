@@ -42,9 +42,10 @@ func TestApplyBestMove_2Steps(t *testing.T) {
 		},
 	}
 	steps := 2
+	seenLimit := 1
 	for _, tt := range tests {
 		R, C := 4, 7
-		board := newBoardRC(R, C)
+		board := newBoardRC(R, C, seenLimit)
 		for _, move := range tt.moves {
 			err, maxScore := board.ApplyBestMove(move.num, steps)
 			board.PrintOverlays()
@@ -78,9 +79,10 @@ func TestApplyBestMove_1Step(t *testing.T) {
 		},
 	}
 	steps := 1
+	seenLimit := 1
 	for _, tt := range tests {
 		R, C := 4, 7
-		board := newBoardRC(R, C)
+		board := newBoardRC(R, C, seenLimit)
 		for _, move := range tt.moves {
 			err, maxScore := board.ApplyBestMove(move.num, steps)
 			// board.PrintOverlays()
@@ -130,15 +132,17 @@ func TestFindBestMoveV2_1Setup2Best(t *testing.T) {
 			nextNum1: 6, wantNextMove1: [2]int{0, 2}, wantNextLevel1: 1,
 		},
 	}
+	seenLimit := 1
 	for _, tt := range tests {
 		R, C := 4, 7
-		board := newBoardRC(R, C)
+		board := newBoardRC(R, C, seenLimit)
 		board.addLayer()
 		board.putNumberAtLayer(0, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
 		steps := 1
+		seenLimit := 1
 		// find best move 0
-		seen := make([]bool, 10)
-		br, bc, level, _, err := findBestMoveV2(board.flat, seen, tt.nextNum0, steps)
+		seen := make([]int, 10)
+		br, bc, level, _, err := findBestMoveV2(board.flat, seen, seenLimit, tt.nextNum0, steps)
 		if err != nil {
 			t.Fatalf("err finding best move: %v", err)
 		}
@@ -151,8 +155,8 @@ func TestFindBestMoveV2_1Setup2Best(t *testing.T) {
 		// apply best move 0
 		board.putNumberAtLayer(level, tt.nextNum0, br, bc)
 		// find best move 1
-		seen = make([]bool, 10)
-		br, bc, level, _, err = findBestMoveV2(board.flat, seen, tt.nextNum1, steps)
+		seen = make([]int, 10)
+		br, bc, level, _, err = findBestMoveV2(board.flat, seen, seenLimit, tt.nextNum1, steps)
 		if err != nil {
 			t.Fatalf("err finding best move: %v", err)
 		}
@@ -201,9 +205,10 @@ func TestFindBestMove1Setup2Best(t *testing.T) {
 			nextNum1: 6, wantNextMove1: [2]int{0, 2}, wantNextLevel1: 1,
 		},
 	}
+	seenLimit := 1
 	for _, tt := range tests {
 		R, C := 4, 7
-		board := newBoardRC(R, C)
+		board := newBoardRC(R, C, seenLimit)
 		board.addLayer()
 		board.putNumberAtLayer(0, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
 		// find best move 0
