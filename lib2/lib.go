@@ -1,4 +1,4 @@
-package lib
+package lib2
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 )
 
 /*
+
+	lib2 uses flat 1D slice instead of 2D slice for perf reasons
 
 	board = all layers + a flat
 	layer = 2D layer where each cell value equals the number placed there
@@ -32,74 +34,29 @@ import (
 */
 
 var EMPTY int8 = -1
-var NUMBER = [][][]int8{
-	{
-		{0, 0, 0},
-		{0, -1, 0},
-		{0, -1, 0},
-		{0, 0, 0},
-	},
-	{
-		{1, 1, -1},
-		{-1, 1, -1},
-		{-1, 1, -1},
-		{-1, 1, -1},
-	},
-	{
-		{-1, 2, 2},
-		{-1, 2, 2},
-		{2, 2, -1},
-		{2, 2, 2},
-	},
-	{
-		{3, 3, 3},
-		{-1, -1, 3},
-		{-1, 3, 3},
-		{3, 3, 3},
-	},
-	{
-		{-1, 4, 4},
-		{-1, 4, -1},
-		{4, 4, 4},
-		{-1, 4, 4},
-	},
-	{
-		{5, 5, 5},
-		{5, 5, 5},
-		{-1, -1, 5},
-		{5, 5, 5},
-	},
-	{
-		{6, 6, -1},
-		{6, -1, -1},
-		{6, 6, 6},
-		{6, 6, 6},
-	},
-	{
-		{7, 7, 7},
-		{-1, 7, -1},
-		{7, 7, -1},
-		{7, -1, -1},
-	},
-	{
-		{-1, 8, 8},
-		{-1, 8, 8},
-		{8, 8, -1},
-		{8, 8, -1},
-	},
-	{
-		{9, 9, 9},
-		{9, 9, 9},
-		{9, 9, -1},
-		{9, 9, -1},
-	},
+var NUMBER = [][]int8{
+	// each row is a rasterized 4x3
+	// NR,NC = 4,3 = 4rows * 3cols
+	// (r,c) = (0,1) = 0*NC + 1 = 1
+	// (r,c) = (1,0) = 1*NC + 0 = 3
+	// (r,c) = (2,2) = 2*NC + 2 = 8
+	{0, 0, 0, 0, -1, 0, 0, -1, 0, 0, 0, 0},
+	{1, 1, -1, -1, 1, -1, -1, 1, -1, -1, 1, -1},
+	{-1, 2, 2, -1, 2, 2, 2, 2, -1, 2, 2, 2},
+	{3, 3, 3, -1, -1, 3, -1, 3, 3, 3, 3, 3},
+	{-1, 4, 4, -1, 4, -1, 4, 4, 4, -1, 4, 4},
+	{5, 5, 5, 5, 5, 5, -1, -1, 5, 5, 5, 5},
+	{6, 6, -1, 6, -1, -1, 6, 6, 6, 6, 6, 6},
+	{7, 7, 7, -1, 7, -1, 7, 7, -1, 7, -1, -1},
+	{-1, 8, 8, -1, 8, 8, 8, 8, -1, 8, 8, -1},
+	{9, 9, 9, 9, 9, 9, 9, 9, -1, 9, 9, -1},
 }
 
 type Board struct {
 	R         int
 	C         int
-	layers    [][][]int8
-	flat      [][]int8
+	layers    [][]int8
+	flat      []int8
 	seen      []int
 	seenLimit int
 }
@@ -112,15 +69,17 @@ func newBoardRC(rows, cols int, seenLimit int) *Board {
 	return &Board{
 		R:         rows,
 		C:         cols,
-		layers:    make([][][]int8, 0, 10),
+		layers:    make([][]int8, 0, 20),
 		flat:      makeFlatRC(rows, cols),
 		seen:      make([]int, 10),
 		seenLimit: seenLimit,
 	}
 }
 
-func (board *Board) addLayer() {
-	board.layers = append(board.layers, makeLayerRC(board.R, board.C))
+func (board *Board) addLayer() []int8 {
+	layer := makeLayerRC(board.R, board.C)
+	board.layers = append(board.layers, layer)
+	return layer
 }
 
 func (board *Board) putNumberAtLayer(level int8, num, row, col int) {
@@ -128,14 +87,14 @@ func (board *Board) putNumberAtLayer(level int8, num, row, col int) {
 		board.addLayer()
 	}
 	layer := board.layers[level]
-	putNumber(layer, num, row, col)
-	board.flat = flatten(board.flat, layer, level)
+	board.putNumber(layer, num, row, col)
+	board.flat = board.flatten(board.flat, layer, level)
 	board.seen[num]++
 }
 
 func (board *Board) setBaseLayer(num int) {
 	// put base layer number in the middle since board should be empty
-	NR, NC := getNumberSize(NUMBER[num])
+	NR, NC := getNumberSize()
 	midR := (board.R - NR) / 2
 	midC := (board.C - NC) / 2
 	board.putNumberAtLayer(0, num, midR, midC)
@@ -151,7 +110,7 @@ func (board *Board) ApplyBestMove(num int, steps int) (error, int) {
 		if board.seen[num] >= board.seenLimit {
 			return fmt.Errorf("num:%v has already been seen limit:%v times", num, board.seenLimit), 0
 		}
-		bestR, bestC, bestLevel, maxScore, err := findBestMoveV2(board.flat, board.seen, board.seenLimit, num, steps)
+		bestR, bestC, bestLevel, maxScore, err := board.findBestMoveV2(board.flat, board.seen, board.seenLimit, num, steps)
 		if err != nil {
 			return err, 0
 		}
@@ -161,29 +120,29 @@ func (board *Board) ApplyBestMove(num int, steps int) (error, int) {
 }
 
 func (board *Board) PrintOverlays() {
-	overlays := make([][][]int8, len(board.layers))
+	overlays := make([][]int8, len(board.layers))
 	lay := makeLayerRC(board.R, board.C)
 	for i, layer := range board.layers {
-		overlay(lay, layer)
+		board.overlay(lay, layer)
 		overlays[i] = copyLayer(lay)
 	}
-	printLayers(overlays)
+	board.printLayers(overlays)
 }
 
 func (board *Board) printFlat() {
-	printLayer(board.flat)
+	board.printLayer(board.flat)
 }
 
-func findBestMoveV2(flat [][]int8, seen []int, seenLimit int, num int, steps int) (int, int, int8, int, error) {
+func (board *Board) findBestMoveV2(flat []int8, seen []int, seenLimit int, num int, steps int) (int, int, int8, int, error) {
 	maxScore := -10000
-	R, C := getLayerSize(flat)
+	R, C := board.R, board.C
 	hasValid := false
 	var bestR, bestC int
 	var bestLevel int8
 	// for every (r,c) check if num can be placed there in a valid way
 	for r := 0; r < R; r++ {
 		for c := 0; c < C; c++ {
-			if valid, level := isValid(flat, num, r, c); valid {
+			if valid, level := board.isValid(flat, num, r, c); valid {
 				hasValid = true
 				// score this move
 				newScore := score(num, level)
@@ -194,17 +153,17 @@ func findBestMoveV2(flat [][]int8, seen []int, seenLimit int, num int, steps int
 				}
 				if steps > 1 {
 					// apply move
-					layer := makeLayerRC(R, C)
-					putNumber(layer, num, r, c)
+					layer := makeLayerRC(board.R, board.C)
+					board.putNumber(layer, num, r, c)
 					seen[num]++
 					// compute new flat
 					newFlat := copyFlat(flat)
-					flatten(newFlat, layer, level)
+					board.flatten(newFlat, layer, level)
 					// recursively find best move
 					for s := 0; s < seenLimit; s++ {
 						for i := range seen {
 							if seen[i] < seenLimit {
-								_, _, _, futureScore, err := findBestMoveV2(newFlat, seen, seenLimit, i, steps-1)
+								_, _, _, futureScore, err := board.findBestMoveV2(newFlat, seen, seenLimit, i, steps-1)
 								if err == nil && newScore+futureScore > maxScore {
 									maxScore = newScore + futureScore
 									bestR, bestC = r, c
@@ -225,14 +184,14 @@ func findBestMoveV2(flat [][]int8, seen []int, seenLimit int, num int, steps int
 	return bestR, bestC, bestLevel, maxScore, nil
 }
 
-func findBestMove(flat [][]int8, num int) (int, int, int8) {
-	R, C := getLayerSize(flat)
+func (board *Board) findBestMove(flat []int8, num int) (int, int, int8) {
+	R, C := board.R, board.C
 	maxScore := -1
 	var bestR, bestC int
 	var bestLevel int8
 	for r := 0; r < R; r++ {
 		for c := 0; c < C; c++ {
-			if valid, level := isValid(flat, num, r, c); valid {
+			if valid, level := board.isValid(flat, num, r, c); valid {
 				newScore := score(num, level)
 				if newScore > maxScore {
 					maxScore = newScore
@@ -245,16 +204,13 @@ func findBestMove(flat [][]int8, num int) (int, int, int8) {
 	return bestR, bestC, bestLevel
 }
 
-func copyLayer(layer [][]int8) [][]int8 {
+func copyLayer(layer []int8) []int8 {
 	return copyFlat(layer)
 }
 
-func copyFlat(flat [][]int8) [][]int8 {
-	flat2 := make([][]int8, len(flat))
-	for i := range flat {
-		flat2[i] = make([]int8, len(flat[i]))
-		copy(flat2[i], flat[i])
-	}
+func copyFlat(flat []int8) []int8 {
+	flat2 := make([]int8, len(flat))
+	copy(flat2, flat)
 	return flat2
 }
 
@@ -263,28 +219,27 @@ func score(num int, level int8) int {
 }
 
 // check if num can be placed at (row,col) using flat
-func isValid(flat [][]int8, num int, row, col int) (bool, int8) {
-	if !isInBounds(flat, num, row, col) {
+func (board *Board) isValid(flat []int8, num int, row, col int) (bool, int8) {
+	if !board.isInBounds(row, col) {
 		return false, 0
 	}
 	// validity requires that every non-empty cell needs to be placed
 	// on top of the same level number
-	same, level := isOnSameLevel(flat, num, row, col)
+	same, level := board.isOnSameLevel(flat, num, row, col)
 	if !same {
 		return false, 0
 	}
 	// if we're placing at the bottom layer, validity also requires that num is
 	// touching an existing already placed number
-	if level == 0 && !isTouching(flat, num, row, col) {
+	if level == 0 && !board.isTouching(flat, num, row, col) {
 		return false, 0
 	}
 	return true, level
 }
 
-func isInBounds(flat [][]int8, num int, row, col int) bool {
-	n := NUMBER[num]
-	NR, NC := getNumberSize(n)
-	R, C := getLayerSize(flat)
+func (board *Board) isInBounds(row, col int) bool {
+	NR, NC := getNumberSize()
+	R, C := board.R, board.C
 	/*
 		000
 		000 (row,col) = (1,1)
@@ -300,32 +255,34 @@ func isInBounds(flat [][]int8, num int, row, col int) bool {
 	return row+NR-1 < R && col+NC-1 < C
 }
 
-func isTouching(flat [][]int8, num int, row, col int) bool {
+// true if num, when placed at (row,col) is touching an existing number in flat
+func (board *Board) isTouching(flat []int8, num int, row, col int) bool {
 	n := NUMBER[num]
-	NR, NC := getNumberSize(n)
+	NR, NC := getNumberSize()
+	R, C := board.R, board.C
 	touching := false
 outer:
-	for r := row; r < row+NR && r < len(flat); r++ {
-		for c := col; c < col+NC && c < len(flat[r]); c++ {
+	for r := row; r < row+NR && r < R; r++ {
+		for c := col; c < col+NC && c < C; c++ {
 			// number cell is not EMPTY
-			if n[r-row][c-col] != EMPTY {
+			if n[((r-row)*NC)+(c-col)] != EMPTY {
 				// top neighbor
-				if r-1 >= 0 && flat[r-1][c] >= 0 {
+				if r-1 >= 0 && flat[(r-1)*C+c] >= 0 {
 					touching = true
 					break outer
 				}
 				// bottom neighbor
-				if r+1 < len(flat) && flat[r+1][c] >= 0 {
+				if r+1 < R && flat[(r+1)*C+c] >= 0 {
 					touching = true
 					break outer
 				}
 				// left neighbor
-				if c-1 >= 0 && flat[r][c-1] >= 0 {
+				if c-1 >= 0 && flat[r*C+(c-1)] >= 0 {
 					touching = true
 					break outer
 				}
 				// right neighbor
-				if c+1 < len(flat[r]) && flat[r][c+1] >= 0 {
+				if c+1 < C && flat[r*C+(c+1)] >= 0 {
 					touching = true
 					break outer
 				}
@@ -335,21 +292,22 @@ outer:
 	return touching
 }
 
-func isOnSameLevel(flat [][]int8, num int, row, col int) (bool, int8) {
+func (board *Board) isOnSameLevel(flat []int8, num int, row, col int) (bool, int8) {
 	n := NUMBER[num]
-	NR, NC := getNumberSize(n)
+	NR, NC := getNumberSize()
+	R, C := board.R, board.C
 	unset := true
 	var fval int8 = -1
 	// validity requires that every non-empty cell needs to be placed
 	// on top of the same level number
-	for r := row; r < row+NR && r < len(flat); r++ {
-		for c := col; c < col+NC && c < len(flat[r]); c++ {
-			if n[r-row][c-col] >= 0 { // if num has non-empty cell...
+	for r := row; r < row+NR && r < R; r++ {
+		for c := col; c < col+NC && c < C; c++ {
+			if n[(r-row)*NC+(c-col)] >= 0 { // if num has non-empty cell...
 				if unset {
-					fval = flat[r][c]
+					fval = flat[r*C+c]
 					unset = false
 				} else {
-					if fval != flat[r][c] { // if num crosses levels...
+					if fval != flat[r*C+c] { // if num crosses levels...
 						return false, 0
 					}
 				}
@@ -362,12 +320,12 @@ func isOnSameLevel(flat [][]int8, num int, row, col int) (bool, int8) {
 
 // merges layer onto flat, modifying flat
 // level is the level of layer
-func flatten(flat, layer [][]int8, level int8) [][]int8 {
-	R, C := getLayerSize(flat)
+func (board *Board) flatten(flat, layer []int8, level int8) []int8 {
+	R, C := board.R, board.C
 	for r := 0; r < R; r++ {
 		for c := 0; c < C; c++ {
-			if layer[r][c] != EMPTY {
-				flat[r][c] = level
+			if layer[r*C+c] != EMPTY {
+				flat[r*C+c] = level
 			}
 		}
 	}
@@ -375,75 +333,64 @@ func flatten(flat, layer [][]int8, level int8) [][]int8 {
 }
 
 // overlay layer2 onto layer1, modifying layer1
-func overlay(layer1, layer2 [][]int8) {
-	R, C := getLayerSize(layer1)
+func (board *Board) overlay(layer1, layer2 []int8) {
+	R, C := board.R, board.C
 	for r := 0; r < R; r++ {
 		for c := 0; c < C; c++ {
-			if layer2[r][c] != EMPTY {
-				layer1[r][c] = layer2[r][c]
+			if layer2[r*C+c] != EMPTY {
+				layer1[r*C+c] = layer2[r*C+c]
 			}
 		}
 	}
 }
 
-func putNumber(layer [][]int8, num, row, col int) {
+func (board *Board) putNumber(layer []int8, num, row, col int) {
 	n := NUMBER[num]
-	NR, NC := getNumberSize(n)
+	NR, NC := getNumberSize()
 	for i := row; i < row+NR; i++ {
 		for j := col; j < col+NC; j++ {
-			if n[i-row][j-col] != EMPTY {
-				layer[i][j] = n[i-row][j-col]
+			nn := n[(i-row)*NC+(j-col)]
+			if nn != EMPTY {
+				layer[i*board.C+j] = nn
 			}
 		}
 	}
 }
 
-func makeFlatRC(rows, cols int) [][]int8 {
+func makeFlatRC(rows, cols int) []int8 {
 	return makeLayerRC(rows, cols)
 }
 
-func makeLayerRC(rows, cols int) [][]int8 {
-	layer := make([][]int8, rows)
+func makeLayerRC(rows, cols int) []int8 {
+	layer := make([]int8, rows*cols)
 	for i := range layer {
-		layer[i] = make([]int8, cols)
-		for j := range layer[i] {
-			layer[i][j] = -1
-		}
+		layer[i] = EMPTY
 	}
 	return layer
 }
 
-func getNumberSize(number [][]int8) (int, int) {
-	return getLayerSize(number)
+func getNumberSize() (int, int) {
+	return 4, 3 // hardcoded
 }
 
-func getLayerSize(layer [][]int8) (int, int) {
-	rows := len(layer)
-	cols := 0
-	if rows > 0 {
-		cols = len(layer[0])
-	}
-	return rows, cols
+func (board *Board) printLayer(layer []int8) {
+	board.printLayers([][]int8{layer})
 }
 
-func printLayer(layer [][]int8) {
-	printLayers([][][]int8{layer})
-}
-
-func printLayers(layers [][][]int8) {
+func (board *Board) printLayers(layers [][]int8) {
 	if len(layers) == 0 {
 		fmt.Println("==========")
 		return
 	}
-	R, C := getLayerSize(layers[0])
+	R, C := board.R, board.C
 	fmt.Println(strings.Repeat("=", (C+3)*len(layers)))
 	for r := 0; r < R; r++ {
 		for _, layer := range layers {
 			for c := 0; c < C; c++ {
-				if layer[r][c] == EMPTY {
+				if layer[r*C+c] == EMPTY {
 					fmt.Printf(".")
 				} else {
-					fmt.Printf(color(layer[r][c], "%v"), layer[r][c])
+					fmt.Printf(color(layer[r*C+c], "%v"), layer[r*C+c])
 				}
 			}
 			if r == R/2 {

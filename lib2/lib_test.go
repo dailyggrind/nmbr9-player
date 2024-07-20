@@ -1,4 +1,4 @@
-package lib
+package lib2
 
 import (
 	"fmt"
@@ -179,7 +179,7 @@ func TestFindBestMoveV2_1Setup2Best(t *testing.T) {
 		seenLimit := 1
 		// find best move 0
 		seen := make([]int, 10)
-		br, bc, level, _, err := findBestMoveV2(board.flat, seen, seenLimit, tt.nextNum0, steps)
+		br, bc, level, _, err := board.findBestMoveV2(board.flat, seen, seenLimit, tt.nextNum0, steps)
 		if err != nil {
 			t.Fatalf("err finding best move: %v", err)
 		}
@@ -193,7 +193,7 @@ func TestFindBestMoveV2_1Setup2Best(t *testing.T) {
 		board.putNumberAtLayer(level, tt.nextNum0, br, bc)
 		// find best move 1
 		seen = make([]int, 10)
-		br, bc, level, _, err = findBestMoveV2(board.flat, seen, seenLimit, tt.nextNum1, steps)
+		br, bc, level, _, err = board.findBestMoveV2(board.flat, seen, seenLimit, tt.nextNum1, steps)
 		if err != nil {
 			t.Fatalf("err finding best move: %v", err)
 		}
@@ -249,7 +249,7 @@ func TestFindBestMove1Setup2Best(t *testing.T) {
 		board.addLayer()
 		board.putNumberAtLayer(0, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
 		// find best move 0
-		br, bc, level := findBestMove(board.flat, tt.nextNum0)
+		br, bc, level := board.findBestMove(board.flat, tt.nextNum0)
 		if best, want := [2]int{br, bc}, tt.wantNextMove0; best != want {
 			t.Fatalf("best move: want:%v != got:%v", want, best)
 		}
@@ -259,7 +259,7 @@ func TestFindBestMove1Setup2Best(t *testing.T) {
 		// apply best move 0
 		board.putNumberAtLayer(level, tt.nextNum0, br, bc)
 		// find best move 1
-		br, bc, level = findBestMove(board.flat, tt.nextNum1)
+		br, bc, level = board.findBestMove(board.flat, tt.nextNum1)
 		if best, want := [2]int{br, bc}, tt.wantNextMove1; best != want {
 			t.Fatalf("best move: want:%v != got:%v", want, best)
 		}
@@ -289,17 +289,18 @@ func TestFindBestMove2Setups1Layer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		R, C := 4, 7
+		board := newBoardRC(R, C, 1)
 		// move 1
-		layer := makeLayerRC(R, C)
-		putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
-		flat := makeFlatRC(R, C)
-		flat = flatten(flat, layer, 1)
+		layer := board.addLayer()
+		board.putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
+		flat := board.flat
+		flat = board.flatten(flat, layer, 1)
 		// move 2
-		layer = makeLayerRC(R, C)
-		putNumber(layer, tt.setupNum1, tt.setupMove1[0], tt.setupMove1[1])
-		flat = flatten(flat, layer, 1)
+		layer = board.addLayer()
+		board.putNumber(layer, tt.setupNum1, tt.setupMove1[0], tt.setupMove1[1])
+		flat = board.flatten(flat, layer, 1)
 		// printLayer(flat)
-		br, bc, _ := findBestMove(flat, tt.nextNum)
+		br, bc, _ := board.findBestMove(flat, tt.nextNum)
 		best := [2]int{br, bc}
 		want := tt.nextMove
 		if best != want {
@@ -336,17 +337,18 @@ func TestFindBestMove2Setups(t *testing.T) {
 	}
 	for _, tt := range tests {
 		R, C := 4, 7
+		board := newBoardRC(R, C, 1)
 		// move 1
-		layer := makeLayerRC(R, C)
-		putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
-		flat := makeFlatRC(R, C)
-		flat = flatten(flat, layer, 1)
+		layer := board.addLayer()
+		board.putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
+		flat := board.flat
+		flat = board.flatten(flat, layer, 1)
 		// move 2
-		layer = makeLayerRC(R, C)
-		putNumber(layer, tt.setupNum1, tt.setupMove1[0], tt.setupMove1[1])
-		flat = flatten(flat, layer, 2)
+		layer = board.addLayer()
+		board.putNumber(layer, tt.setupNum1, tt.setupMove1[0], tt.setupMove1[1])
+		flat = board.flatten(flat, layer, 2)
 		// printLayer(flat)
-		br, bc, _ := findBestMove(flat, tt.nextNum)
+		br, bc, _ := board.findBestMove(flat, tt.nextNum)
 		best := [2]int{br, bc}
 		want := tt.nextMove
 		if best != want {
@@ -389,11 +391,12 @@ func TestFindBestMove1Setup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		R, C := 4, 7
-		layer := makeLayerRC(R, C)
-		putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
-		flat := makeFlatRC(R, C)
-		flat = flatten(flat, layer, 1)
-		br, bc, _ := findBestMove(flat, tt.nextNum)
+		board := newBoardRC(R, C, 1)
+		layer := board.addLayer()
+		board.putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
+		flat := board.flat
+		flat = board.flatten(flat, layer, 1)
+		br, bc, _ := board.findBestMove(flat, tt.nextNum)
 		best := [2]int{br, bc}
 		want := tt.nextMove
 		if best != want {
@@ -438,13 +441,14 @@ func TestIsValid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		R, C := 4, 7
+		board := newBoardRC(R, C, 1)
 		// move 1
-		layer := makeLayerRC(R, C)
-		putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
-		flat := makeFlatRC(R, C)
-		flat = flatten(flat, layer, 0)
+		layer := board.addLayer()
+		board.putNumber(layer, tt.setupNum, tt.setupMove[0], tt.setupMove[1])
+		flat := board.flat
+		flat = board.flatten(flat, layer, 0)
 
-		valid, level := isValid(flat, tt.nextNum, tt.nextMove[0], tt.nextMove[1])
+		valid, level := board.isValid(flat, tt.nextNum, tt.nextMove[0], tt.nextMove[1])
 		if valid != tt.wantValid {
 			t.Fatalf("valid: want not equal to got: %v != %v", tt.wantValid, valid)
 		}
@@ -456,7 +460,7 @@ func TestIsValid(t *testing.T) {
 
 func TestIsInBounds(t *testing.T) {
 	R, C := 4, 5
-	flat := makeFlatRC(R, C)
+	board := newBoardRC(R, C, 1)
 	/*
 		should be in bounds:
 		01110
@@ -464,7 +468,7 @@ func TestIsInBounds(t *testing.T) {
 		01010
 		01110
 	*/
-	got := isInBounds(flat, 0, 0, 1)
+	got := board.isInBounds(0, 1)
 	want := true
 	if want != got {
 		t.Fatalf("want not equal to got: %v != %v", want, got)
@@ -476,7 +480,7 @@ func TestIsInBounds(t *testing.T) {
 		01010
 		01010
 	*/
-	got = isInBounds(flat, 0, 1, 1)
+	got = board.isInBounds(1, 1)
 	want = false
 	if want != got {
 		t.Fatalf("want not equal to got: %v != %v", want, got)
@@ -488,7 +492,7 @@ func TestIsInBounds(t *testing.T) {
 		00010
 		00011
 	*/
-	got = isInBounds(flat, 0, 0, 3)
+	got = board.isInBounds(0, 3)
 	if want != got {
 		t.Fatalf("want not equal to got: %v != %v", want, got)
 	}
@@ -496,8 +500,9 @@ func TestIsInBounds(t *testing.T) {
 
 func TestFlatten(t *testing.T) {
 	R, C := 4, 5
-	layer := makeLayerRC(R, C)
-	putNumber(layer, 0, 0, 1)
+	board := newBoardRC(R, C, 1)
+	layer := board.addLayer()
+	board.putNumber(layer, 0, 0, 1)
 	/*
 		should be:
 		E000E
@@ -506,7 +511,7 @@ func TestFlatten(t *testing.T) {
 		E000E
 	*/
 	flat := makeFlatRC(R, C)
-	flat = flatten(flat, layer, 0)
+	flat = board.flatten(flat, layer, 0)
 	/*
 		should be:
 		.000.
@@ -514,23 +519,18 @@ func TestFlatten(t *testing.T) {
 		.0.0.
 		.000.
 	*/
-	want := [][]int8{
-		{-1, 0, 0, 0, -1},
-		{-1, 0, -1, 0, -1},
-		{-1, 0, -1, 0, -1},
-		{-1, 0, 0, 0, -1},
-	}
+	want := []int8{-1, 0, 0, 0, -1, -1, 0, -1, 0, -1, -1, 0, -1, 0, -1, -1, 0, 0, 0, -1}
 	if !reflect.DeepEqual(flat, want) {
 		fmt.Println("want:")
-		printLayer(want)
+		board.printLayer(want)
 		fmt.Println("got:")
-		printLayer(flat)
+		board.printLayer(flat)
 		t.Fatalf("want not equal to got")
 	}
 	// add another layer and flatten it
-	layer = makeLayerRC(R, C)
-	putNumber(layer, 1, 0, 2)
-	flat = flatten(flat, layer, 1)
+	layer = board.addLayer()
+	board.putNumber(layer, 1, 0, 2)
+	flat = board.flatten(flat, layer, 1)
 	/*
 		should be:
 		.011.
@@ -538,26 +538,22 @@ func TestFlatten(t *testing.T) {
 		.0.1.
 		.001.
 	*/
-	want = [][]int8{
-		{-1, 0, 1, 1, -1},
-		{-1, 0, -1, 1, -1},
-		{-1, 0, -1, 1, -1},
-		{-1, 0, 0, 1, -1},
-	}
+	want = []int8{-1, 0, 1, 1, -1, -1, 0, -1, 1, -1, -1, 0, -1, 1, -1, -1, 0, 0, 1, -1}
 	if !reflect.DeepEqual(flat, want) {
 		fmt.Println("want:")
-		printLayer(want)
+		board.printLayer(want)
 		fmt.Println("got:")
-		printLayer(flat)
+		board.printLayer(flat)
 		t.Fatalf("want not equal to got")
 	}
 }
 
 func TestPutNumberSkipEmpty(t *testing.T) {
 	R, C := 4, 5
-	layer := makeLayerRC(R, C)
-	putNumber(layer, 2, 0, 0)
-	putNumber(layer, 4, 0, 2)
+	board := newBoardRC(R, C, 1)
+	layer := board.addLayer()
+	board.putNumber(layer, 2, 0, 0)
+	board.putNumber(layer, 4, 0, 2)
 	/*
 		should be:
 		.22..  .2244
@@ -565,25 +561,22 @@ func TestPutNumberSkipEmpty(t *testing.T) {
 		22...  22444
 		222..  22244
 	*/
-	want := [][]int8{
-		{-1, 2, 2, 4, 4},
-		{-1, 2, 2, 4, -1},
-		{2, 2, 4, 4, 4},
-		{2, 2, 2, 4, 4},
-	}
+	want := []int8{-1, 2, 2, 4, 4, -1, 2, 2, 4, -1, 2, 2, 4, 4, 4, 2, 2, 2, 4, 4}
 	if !reflect.DeepEqual(layer, want) {
 		fmt.Println("want:")
-		printLayer(want)
+		board.printLayer(want)
 		fmt.Println("got:")
-		printLayer(layer)
+		board.printLayer(layer)
 		t.Fatalf("want not equal to got")
 	}
 }
 
 func TestPutNumber(t *testing.T) {
 	R, C := 4, 5
-	layer := makeLayerRC(R, C)
-	putNumber(layer, 0, 0, 1)
+	// layer := makeLayerRC(R, C)
+	board := newBoardRC(R, C, 1)
+	layer := board.addLayer()
+	board.putNumber(layer, 0, 0, 1)
 	/*
 		should be:
 		E000E
@@ -591,37 +584,34 @@ func TestPutNumber(t *testing.T) {
 		E0E0E
 		E000E
 	*/
-	want := [][]int8{
-		{-1, 0, 0, 0, -1},
-		{-1, 0, -1, 0, -1},
-		{-1, 0, -1, 0, -1},
-		{-1, 0, 0, 0, -1},
-	}
+	want := []int8{-1, 0, 0, 0, -1, -1, 0, -1, 0, -1, -1, 0, -1, 0, -1, -1, 0, 0, 0, -1}
+
 	if !reflect.DeepEqual(layer, want) {
 		fmt.Println("want:")
-		printLayer(want)
+		board.printLayer(want)
 		fmt.Println("got:")
-		printLayer(layer)
+		board.printLayer(layer)
 		t.Fatalf("want not equal to got")
 	}
 }
 
 func TestMakeLayer(t *testing.T) {
-	layer := makeLayerRC(10, 10)
-	R, C := getLayerSize(layer)
+	R, C := 10, 10
+	layer := makeLayerRC(R, C)
 	for i := 0; i < R; i++ {
 		for j := 0; j < C; j++ {
-			if layer[i][j] != -1 {
-				t.Fatalf("Cell not initialized to -1: %v", layer[i][j])
+			if layer[i*C+j] != -1 {
+				t.Fatalf("Cell not initialized to -1: %v", layer[i*C+j])
 			}
 		}
 	}
 }
 
 func TestPrintLayers(t *testing.T) {
-	R, C := 10, 10
-	layer1 := makeLayerRC(R, C)
-	layer2 := makeLayerRC(R, C)
-	layers := [][][]int8{layer1, layer2}
-	printLayers(layers)
+	// R, C := 10, 10
+	// layer1 := makeLayerRC(R, C)
+	// layer2 := makeLayerRC(R, C)
+	// layers := [][][]int8{layer1, layer2}
+	board := newBoardRC(10, 10, 1)
+	board.printLayers(board.layers)
 }

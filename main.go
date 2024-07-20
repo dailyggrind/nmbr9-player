@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"nmbr9/lib"
+	"nmbr9/lib2"
 )
 
 /*
@@ -33,14 +33,14 @@ import (
 
 func main() {
 	// input := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-	steps := 3
+	steps := 4
 	fmt.Printf("how many steps ahead (default:%v): ", steps)
 	_, err := fmt.Scanf("%d\n", &steps)
 	if err != nil && err.Error() != "unexpected newline" {
 		fmt.Printf("error scanning input: %v\n", err)
 		return
 	}
-	board := lib.NewBoard()
+	board := lib2.NewBoard()
 	var num int
 	for {
 		fmt.Print("enter a number: ")
