@@ -15,7 +15,7 @@ func TestApplyBestMove(t *testing.T) {
 		if err != nil {
 			fmt.Printf("error applying best move: %v\n", err)
 		} else {
-			board.PrintOverlays()
+			board.PrintOverlays(true)
 			// fmt.Printf("best move score: %v\n", score)
 		}
 	}
@@ -47,11 +47,12 @@ func TestApplyBestMove_Speed(t *testing.T) {
 		board := newBoardRC(R, C, seenLimit)
 		for _, move := range tt.moves {
 			err, maxScore := board.ApplyBestMove(move.num, steps)
-			board.PrintOverlays()
+			board.PrintOverlays(true)
 			if err != nil {
 				t.Fatalf("err applying best move: %v", err)
 			}
 			fmt.Printf("maxScore: %v\n", maxScore)
+			// board.printFlat()
 			// if maxScore != move.maxScore {
 			// 	t.Fatalf("maxScore: want:%v != got:%v", move.maxScore, maxScore)
 			// }
@@ -85,7 +86,7 @@ func TestApplyBestMove_2Steps(t *testing.T) {
 		board := newBoardRC(R, C, seenLimit)
 		for _, move := range tt.moves {
 			err, maxScore := board.ApplyBestMove(move.num, steps)
-			board.PrintOverlays()
+			board.PrintOverlays(true)
 			if err != nil {
 				t.Fatalf("err applying best move: %v", err)
 			}
@@ -519,8 +520,8 @@ func TestFlatten(t *testing.T) {
 		.0.0.
 		.000.
 	*/
-	want := []int8{-1, 0, 0, 0, -1, -1, 0, -1, 0, -1, -1, 0, -1, 0, -1, -1, 0, 0, 0, -1}
-	if !reflect.DeepEqual(flat, want) {
+	want := &Layer{cells: []int8{-1, 0, 0, 0, -1, -1, 0, -1, 0, -1, -1, 0, -1, 0, -1, -1, 0, 0, 0, -1}}
+	if !reflect.DeepEqual(flat.cells, want.cells) {
 		fmt.Println("want:")
 		board.printLayer(want)
 		fmt.Println("got:")
@@ -538,13 +539,46 @@ func TestFlatten(t *testing.T) {
 		.0.1.
 		.001.
 	*/
-	want = []int8{-1, 0, 1, 1, -1, -1, 0, -1, 1, -1, -1, 0, -1, 1, -1, -1, 0, 0, 1, -1}
-	if !reflect.DeepEqual(flat, want) {
+	want = &Layer{cells: []int8{-1, 0, 1, 1, -1, -1, 0, -1, 1, -1, -1, 0, -1, 1, -1, -1, 0, 0, 1, -1}}
+	if !reflect.DeepEqual(flat.cells, want.cells) {
 		fmt.Println("want:")
 		board.printLayer(want)
 		fmt.Println("got:")
 		board.printLayer(flat)
 		t.Fatalf("want not equal to got")
+	}
+}
+
+func TestPutNumberBoundingBox(t *testing.T) {
+	R, C := 12, 10
+	board := newBoardRC(R, C, 1)
+	layer := board.addLayer()
+	/*
+		should be:
+		.......  .......
+		.......  .......
+		...22..  ...2244
+		...22..  ...224.
+		..22...  ..22444
+		..222..  ..22244
+	*/
+	board.putNumber(layer, 2, 2, 2)
+	if layer.BB_TL_R != 2 || layer.BB_TL_C != 2 {
+		board.printLayer(layer)
+		t.Fatalf("bounding box top left: want:%v != got:%v", []int{2, 2}, []int{layer.BB_TL_R, layer.BB_TL_C})
+	}
+	if layer.BB_BR_R != 5 || layer.BB_BR_C != 4 {
+		board.printLayer(layer)
+		t.Fatalf("bounding box bottom right: want:%v != got:%v", []int{5, 4}, []int{layer.BB_BR_R, layer.BB_BR_C})
+	}
+	board.putNumber(layer, 4, 2, 4)
+	if layer.BB_TL_R != 2 || layer.BB_TL_C != 2 {
+		board.printLayer(layer)
+		t.Fatalf("bounding box top left: want:%v != got:%v", []int{2, 2}, []int{layer.BB_TL_R, layer.BB_TL_C})
+	}
+	if layer.BB_BR_R != 5 || layer.BB_BR_C != 6 {
+		board.printLayer(layer)
+		t.Fatalf("bounding box bottom right: want:%v != got:%v", []int{5, 6}, []int{layer.BB_BR_R, layer.BB_BR_C})
 	}
 }
 
@@ -561,8 +595,8 @@ func TestPutNumberSkipEmpty(t *testing.T) {
 		22...  22444
 		222..  22244
 	*/
-	want := []int8{-1, 2, 2, 4, 4, -1, 2, 2, 4, -1, 2, 2, 4, 4, 4, 2, 2, 2, 4, 4}
-	if !reflect.DeepEqual(layer, want) {
+	want := &Layer{cells: []int8{-1, 2, 2, 4, 4, -1, 2, 2, 4, -1, 2, 2, 4, 4, 4, 2, 2, 2, 4, 4}}
+	if !reflect.DeepEqual(layer.cells, want.cells) {
 		fmt.Println("want:")
 		board.printLayer(want)
 		fmt.Println("got:")
@@ -584,9 +618,8 @@ func TestPutNumber(t *testing.T) {
 		E0E0E
 		E000E
 	*/
-	want := []int8{-1, 0, 0, 0, -1, -1, 0, -1, 0, -1, -1, 0, -1, 0, -1, -1, 0, 0, 0, -1}
-
-	if !reflect.DeepEqual(layer, want) {
+	want := &Layer{cells: []int8{-1, 0, 0, 0, -1, -1, 0, -1, 0, -1, -1, 0, -1, 0, -1, -1, 0, 0, 0, -1}}
+	if !reflect.DeepEqual(layer.cells, want.cells) {
 		fmt.Println("want:")
 		board.printLayer(want)
 		fmt.Println("got:")
@@ -600,8 +633,8 @@ func TestMakeLayer(t *testing.T) {
 	layer := makeLayerRC(R, C)
 	for i := 0; i < R; i++ {
 		for j := 0; j < C; j++ {
-			if layer[i*C+j] != -1 {
-				t.Fatalf("Cell not initialized to -1: %v", layer[i*C+j])
+			if layer.cells[i*C+j] != -1 {
+				t.Fatalf("Cell not initialized to -1: %v", layer.cells[i*C+j])
 			}
 		}
 	}

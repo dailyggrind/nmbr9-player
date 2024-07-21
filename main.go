@@ -54,7 +54,7 @@ func main() {
 			fmt.Printf("error applying best move: %v\n", err)
 			continue
 		} else {
-			board.PrintOverlays()
+			board.PrintOverlays(false)
 			// fmt.Printf("best move score: %v\n", score)
 		}
 	}
