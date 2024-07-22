@@ -48,6 +48,7 @@ func TestApplyBestMove_Speed(t *testing.T) {
 		for _, move := range tt.moves {
 			err, maxScore := board.ApplyBestMove(move.num, steps)
 			board.PrintOverlays(true)
+			fmt.Printf("fanout: %v\n", board.fanout)
 			if err != nil {
 				t.Fatalf("err applying best move: %v", err)
 			}

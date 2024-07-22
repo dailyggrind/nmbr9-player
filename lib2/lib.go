@@ -60,6 +60,7 @@ type Board struct {
 	flat      *Layer
 	seen      []int
 	seenLimit int
+	fanout    []int
 }
 
 type Layer struct {
@@ -88,6 +89,7 @@ func newBoardRC(rows, cols int, seenLimit int) *Board {
 		flat:      makeFlatRC(rows, cols),
 		seen:      make([]int, 10),
 		seenLimit: seenLimit,
+		fanout:    make([]int, 10),
 	}
 }
 
@@ -125,6 +127,7 @@ func (board *Board) ApplyBestMove(num int, steps int) (error, int) {
 		if board.seen[num] >= board.seenLimit {
 			return fmt.Errorf("num:%v has already been seen limit:%v times", num, board.seenLimit), 0
 		}
+		board.fanout = make([]int, steps)
 		bestR, bestC, bestLevel, maxScore, err := board.findBestMoveV2(board.flat, board.seen, board.seenLimit, num, steps)
 		if err != nil {
 			return err, 0
@@ -163,6 +166,7 @@ func max(a, b int) int {
 }
 
 func (board *Board) findBestMoveV2(flat *Layer, seen []int, seenLimit int, num int, steps int) (int, int, int8, int, error) {
+	board.fanout[len(board.fanout)-steps]++
 	maxScore := -10000
 	R, C := board.R, board.C
 	NR, NC := getNumberSize()
